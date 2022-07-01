@@ -98,6 +98,10 @@ public class WorkflowReportJob {
         return Conclusion.SKIPPED.equals(conclusion);
     }
 
+    public boolean isCancelled() {
+        return Conclusion.CANCELLED.equals(conclusion);
+    }
+
     public String getFailingStep() {
         return failingStep;
     }
