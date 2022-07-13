@@ -20,6 +20,7 @@ import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile.TriageRule;
 import io.quarkus.bot.util.GHIssues;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 import io.quarkus.bot.util.Strings;
 import io.quarkus.bot.util.Triage;
 import org.kohsuke.github.GHLabel;
@@ -31,8 +32,14 @@ class TriageIssue {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void triageIssue(@Issue.Opened GHEventPayload.Issue issuePayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(issuePayload.getRepository())) {
+            return;
+        }
         if (!Feature.TRIAGE_ISSUES_AND_PULL_REQUESTS.isEnabled(quarkusBotConfigFile)) {
             return;
         }

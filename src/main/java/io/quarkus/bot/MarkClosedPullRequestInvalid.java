@@ -15,6 +15,7 @@ import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 
 class MarkClosedPullRequestInvalid {
 
@@ -23,8 +24,14 @@ class MarkClosedPullRequestInvalid {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void markClosedPullRequestInvalid(@PullRequest.Closed GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(pullRequestPayload.getRepository())) {
+            return;
+        }
         if (!Feature.QUARKUS_REPOSITORY_WORKFLOW.isEnabled(quarkusBotConfigFile)) {
             return;
         }

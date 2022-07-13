@@ -16,6 +16,7 @@ import io.quarkus.bot.buildreporter.BuildReporterEventHandler;
 import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
+import io.quarkus.bot.util.Repositories;
 import io.quarkus.bot.workflow.QuarkusWorkflowConstants;
 import io.smallrye.graphql.client.dynamic.api.DynamicGraphQLClient;
 
@@ -27,9 +28,15 @@ public class AnalyzeWorkflowRunResults {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void analyzeWorkflowResults(@WorkflowRun.Completed @WorkflowRun.Requested GHEventPayload.WorkflowRun workflowRunPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile,
             GitHub gitHub, DynamicGraphQLClient gitHubGraphQLClient) throws IOException {
+        if (!repositories.isMainRepository(workflowRunPayload.getRepository())) {
+            return;
+        }
         if (!Feature.ANALYZE_WORKFLOW_RUN_RESULTS.isEnabled(quarkusBotConfigFile)) {
             return;
         }

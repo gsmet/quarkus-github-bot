@@ -9,6 +9,8 @@ import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.GHIssues;
 import io.quarkus.bot.util.GHPullRequests;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
+
 import org.jboss.logging.Logger;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
@@ -23,8 +25,14 @@ class RemoveInvalidLabelOnReopenAction {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     public void onIssueReopen(@Issue.Reopened GHEventPayload.Issue issuePayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(issuePayload.getRepository())) {
+            return;
+        }
         if (!Feature.QUARKUS_REPOSITORY_WORKFLOW.isEnabled(quarkusBotConfigFile)) {
             return;
         }
@@ -40,7 +48,15 @@ class RemoveInvalidLabelOnReopenAction {
         }
     }
 
-    public void onPullRequestReopen(@PullRequest.Reopened GHEventPayload.PullRequest pullRequestPayload) throws IOException {
+    public void onPullRequestReopen(@PullRequest.Reopened GHEventPayload.PullRequest pullRequestPayload,
+            @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(pullRequestPayload.getRepository())) {
+            return;
+        }
+        if (!Feature.QUARKUS_REPOSITORY_WORKFLOW.isEnabled(quarkusBotConfigFile)) {
+            return;
+        }
+
         GHPullRequest pullRequest = pullRequestPayload.getPullRequest();
 
         if (GHPullRequests.hasLabel(pullRequest, Labels.TRIAGE_INVALID)) {

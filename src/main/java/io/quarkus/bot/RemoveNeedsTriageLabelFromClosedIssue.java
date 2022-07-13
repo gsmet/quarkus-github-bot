@@ -15,6 +15,7 @@ import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 
 public class RemoveNeedsTriageLabelFromClosedIssue {
 
@@ -23,8 +24,14 @@ public class RemoveNeedsTriageLabelFromClosedIssue {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void onClose(@Issue.Closed GHEventPayload.Issue issuePayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(issuePayload.getRepository())) {
+            return;
+        }
         if (!Feature.TRIAGE_ISSUES_AND_PULL_REQUESTS.isEnabled(quarkusBotConfigFile)) {
             return;
         }

@@ -13,6 +13,7 @@ import io.quarkiverse.githubapp.event.Issue;
 import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
+import io.quarkus.bot.util.Repositories;
 
 public class CheckIssueEditorialRules {
     private static final Logger LOG = Logger.getLogger(CheckIssueEditorialRules.class);
@@ -26,8 +27,14 @@ public class CheckIssueEditorialRules {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void onOpen(@Issue.Opened GHEventPayload.Issue issuePayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(issuePayload.getRepository())) {
+            return;
+        }
         if (!Feature.CHECK_EDITORIAL_RULES.isEnabled(quarkusBotConfigFile)) {
             return;
         }

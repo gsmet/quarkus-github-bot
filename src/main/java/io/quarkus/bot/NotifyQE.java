@@ -7,6 +7,8 @@ import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
+
 import org.jboss.logging.Logger;
 import org.kohsuke.github.GHEventPayload;
 import org.kohsuke.github.GHIssue;
@@ -23,8 +25,14 @@ public class NotifyQE {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void commentOnIssue(@Issue.Labeled GHEventPayload.Issue issuePayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(issuePayload.getRepository())) {
+            return;
+        }
         if (!Feature.NOTIFY_QE.isEnabled(quarkusBotConfigFile)) {
             return;
         }
@@ -34,6 +42,9 @@ public class NotifyQE {
 
     void commentOnPullRequest(@PullRequest.Labeled GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(pullRequestPayload.getRepository())) {
+            return;
+        }
         if (!Feature.NOTIFY_QE.isEnabled(quarkusBotConfigFile)) {
             return;
         }

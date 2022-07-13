@@ -16,6 +16,7 @@ import io.quarkiverse.githubapp.event.PullRequest;
 import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
+import io.quarkus.bot.util.Repositories;
 import io.quarkus.bot.workflow.QuarkusWorkflowConstants;
 
 class CancelWorkflowOnClosedPullRequest {
@@ -24,8 +25,14 @@ class CancelWorkflowOnClosedPullRequest {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     public void onClose(@PullRequest.Closed GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(pullRequestPayload.getRepository())) {
+            return;
+        }
         if (!Feature.QUARKUS_REPOSITORY_WORKFLOW.isEnabled(quarkusBotConfigFile)) {
             return;
         }

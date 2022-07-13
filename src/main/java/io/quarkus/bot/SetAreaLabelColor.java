@@ -15,18 +15,25 @@ import io.quarkus.bot.config.Feature;
 import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 
 public class SetAreaLabelColor {
 
     private static final Logger LOG = Logger.getLogger(SetAreaLabelColor.class);
 
+    private static final String AREA_LABEL_COLOR = "0366d6";
+
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
-    private static final String AREA_LABEL_COLOR = "0366d6";
+    @Inject
+    Repositories repositories;
 
     void setAreaLabelColor(@Label.Created GHEventPayload.Label labelPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(labelPayload.getRepository())) {
+            return;
+        }
         if (!Feature.SET_AREA_LABEL_COLOR.isEnabled(quarkusBotConfigFile)) {
             return;
         }

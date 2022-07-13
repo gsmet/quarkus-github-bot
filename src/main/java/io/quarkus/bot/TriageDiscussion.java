@@ -25,6 +25,7 @@ import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile.TriageRule;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 import io.quarkus.bot.util.Strings;
 import io.quarkus.bot.util.Triage;
 import io.smallrye.graphql.client.Response;
@@ -37,9 +38,15 @@ class TriageDiscussion {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void triageDiscussion(@Discussion.Created @Discussion.CategoryChanged GHEventPayload.Discussion discussionPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile,
             DynamicGraphQLClient gitHubGraphQLClient) throws IOException {
+        if (!repositories.isMainRepository(discussionPayload.getRepository())) {
+            return;
+        }
         if (!Feature.TRIAGE_DISCUSSIONS.isEnabled(quarkusBotConfigFile)) {
             return;
         }

@@ -17,6 +17,7 @@ import io.quarkus.bot.config.QuarkusGitHubBotConfig;
 import io.quarkus.bot.config.QuarkusGitHubBotConfigFile;
 import io.quarkus.bot.util.IssueExtractor;
 import io.quarkus.bot.util.Labels;
+import io.quarkus.bot.util.Repositories;
 import io.quarkus.bot.util.Strings;
 
 class AffectKindToPullRequest {
@@ -28,8 +29,14 @@ class AffectKindToPullRequest {
     @Inject
     QuarkusGitHubBotConfig quarkusBotConfig;
 
+    @Inject
+    Repositories repositories;
+
     void dependabotComponentUpgrade(@PullRequest.Closed GHEventPayload.PullRequest pullRequestPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile) throws IOException {
+        if (!repositories.isMainRepository(pullRequestPayload.getRepository())) {
+            return;
+        }
         if (!Feature.QUARKUS_REPOSITORY_WORKFLOW.isEnabled(quarkusBotConfigFile)) {
             return;
         }
