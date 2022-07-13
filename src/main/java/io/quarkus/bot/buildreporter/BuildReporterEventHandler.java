@@ -116,6 +116,24 @@ public class BuildReporterEventHandler {
             artifactsAvailable = false;
         }
 
+        if (buildReporterConfig.isFork()) {
+            // in the case of a workflow running in a fork, we only create a check run
+            WorkflowContext workflowContext = WorkflowContext.fork(workflowRun.getRepository());
+
+            Optional<WorkflowReport> workflowReportOptional = generateWorkflowReport(workflowRun, buildReporterConfig,
+                    workflowContext, artifacts, artifactsAvailable);
+            if (workflowReportOptional.isEmpty()) {
+                return;
+            }
+
+            WorkflowReport workflowReport = workflowReportOptional.get();
+
+            createCheckRun(workflowRun, buildReporterConfig, workflowContext,
+                    artifactsAvailable, workflowReport);
+
+            return;
+        }
+
         if (workflowRun.getEvent() == GHEvent.PULL_REQUEST) {
             Optional<GHPullRequest> pullRequestOptional = getAssociatedPullRequest(workflowRun, artifacts);
 
@@ -125,7 +143,7 @@ public class BuildReporterEventHandler {
             }
 
             GHPullRequest pullRequest = pullRequestOptional.get();
-            WorkflowContext workflowContext = new WorkflowContext(pullRequest);
+            WorkflowContext workflowContext = WorkflowContext.pullRequest(pullRequest);
 
             hideOutdatedWorkflowRunResults(buildReporterConfig, workflowContext, pullRequest,
                     gitHubGraphQLClient);
@@ -134,8 +152,19 @@ public class BuildReporterEventHandler {
                 return;
             }
 
-            Optional<String> reportCommentOptional = generateReportComment(workflowRun, buildReporterConfig, workflowContext,
-                    artifacts, artifactsAvailable);
+            Optional<WorkflowReport> workflowReportOptional = generateWorkflowReport(workflowRun, buildReporterConfig,
+                    workflowContext, artifacts, artifactsAvailable);
+            if (workflowReportOptional.isEmpty()) {
+                return;
+            }
+
+            WorkflowReport workflowReport = workflowReportOptional.get();
+
+            Optional<GHCheckRun> checkRunOptional = createCheckRun(workflowRun, buildReporterConfig, workflowContext,
+                    artifactsAvailable, workflowReport);
+
+            Optional<String> reportCommentOptional = generateReportComment(workflowReport, checkRunOptional.orElse(null),
+                    artifactsAvailable);
 
             if (reportCommentOptional.isEmpty()) {
                 return;
@@ -151,68 +180,77 @@ public class BuildReporterEventHandler {
         } else {
             Optional<GHIssue> reportIssueOptional = getAssociatedReportIssue(gitHub, workflowRun, artifacts);
 
-            if (reportIssueOptional.isEmpty()) {
-                return;
-            }
+            if (reportIssueOptional.isPresent()) {
+                GHIssue reportIssue = reportIssueOptional.get();
+                WorkflowContext workflowContext = WorkflowContext.issue(reportIssue);
 
-            GHIssue reportIssue = reportIssueOptional.get();
-            WorkflowContext workflowContext = new WorkflowContext(reportIssue);
+                hideOutdatedWorkflowRunResults(buildReporterConfig, workflowContext, reportIssue,
+                        gitHubGraphQLClient);
 
-            hideOutdatedWorkflowRunResults(buildReporterConfig, workflowContext, reportIssue,
-                    gitHubGraphQLClient);
+                if (workflowRun.getConclusion() == Conclusion.SUCCESS
+                        && reportIssue.getState() == GHIssueState.OPEN) {
+                    String fixedComment = ":heavy_check_mark: **Build fixed:**\n* Link to latest CI run: "
+                            + workflowRun.getHtmlUrl().toString();
 
-            if (workflowRun.getConclusion() == Conclusion.SUCCESS
-                    && reportIssue.getState() == GHIssueState.OPEN) {
-                String fixedComment = ":heavy_check_mark: **Build fixed:**\n* Link to latest CI run: "
-                        + workflowRun.getHtmlUrl().toString();
+                    if (!buildReporterConfig.isDryRun()) {
+                        reportIssue.comment(fixedComment);
+                        reportIssue.close();
+                    } else {
+                        LOG.info("Issue #" + reportIssue.getNumber() + " - Add comment: " + fixedComment);
+                        LOG.info("Issue #" + reportIssue.getNumber() + " - Closing report issue");
+                    }
+                    return;
+                }
+
+                if (workflowRun.getConclusion() != Conclusion.FAILURE) {
+                    return;
+                }
 
                 if (!buildReporterConfig.isDryRun()) {
-                    reportIssue.comment(fixedComment);
-                    reportIssue.close();
+                    reportIssue.reopen();
                 } else {
-                    LOG.info("Issue #" + reportIssue.getNumber() + " - Add comment: " + fixedComment);
-                    LOG.info("Issue #" + reportIssue.getNumber() + " - Closing report issue");
+                    LOG.info("Issue #" + reportIssue.getNumber() + " - Reopening report issue");
                 }
-                return;
-            }
 
-            if (workflowRun.getConclusion() != Conclusion.FAILURE) {
-                return;
-            }
+                Optional<WorkflowReport> workflowReportOptional = generateWorkflowReport(workflowRun, buildReporterConfig,
+                        workflowContext, artifacts, artifactsAvailable);
+                if (workflowReportOptional.isEmpty()) {
+                    return;
+                }
 
-            if (!buildReporterConfig.isDryRun()) {
-                reportIssue.reopen();
-            } else {
-                LOG.info("Issue #" + reportIssue.getNumber() + " - Reopening report issue");
-            }
+                WorkflowReport workflowReport = workflowReportOptional.get();
 
-            Optional<String> reportCommentOptional = generateReportComment(workflowRun, buildReporterConfig, workflowContext,
-                    artifacts, artifactsAvailable);
+                Optional<GHCheckRun> checkRunOptional = createCheckRun(workflowRun, buildReporterConfig, workflowContext,
+                        artifactsAvailable, workflowReport);
 
-            if (reportCommentOptional.isEmpty()) {
-                // not able to generate a proper report but let's post a default comment anyway
-                String defaultFailureComment = "The build is failing and we were not able to generate a report:\n* Link to latest CI run: "
-                        + workflowRun.getHtmlUrl().toString();
+                Optional<String> reportCommentOptional = generateReportComment(workflowReport, checkRunOptional.orElse(null),
+                        artifactsAvailable);
+
+                if (reportCommentOptional.isEmpty()) {
+                    // not able to generate a proper report but let's post a default comment anyway
+                    String defaultFailureComment = "The build is failing and we were not able to generate a report:\n* Link to latest CI run: "
+                            + workflowRun.getHtmlUrl().toString();
+
+                    if (!buildReporterConfig.isDryRun()) {
+                        reportIssue.comment(defaultFailureComment);
+                    } else {
+                        LOG.info("Issue #" + reportIssue.getNumber() + " - Add comment: " + defaultFailureComment);
+                    }
+                    return;
+                }
+
+                String reportComment = reportCommentOptional.get();
 
                 if (!buildReporterConfig.isDryRun()) {
-                    reportIssue.comment(defaultFailureComment);
+                    reportIssue.comment(reportComment);
                 } else {
-                    LOG.info("Issue #" + reportIssue.getNumber() + " - Add comment: " + defaultFailureComment);
+                    LOG.info("Issue #" + reportIssue.getNumber() + " - Add test failures:\n" + reportComment);
                 }
-                return;
-            }
-
-            String reportComment = reportCommentOptional.get();
-
-            if (!buildReporterConfig.isDryRun()) {
-                reportIssue.comment(reportComment);
-            } else {
-                LOG.info("Issue #" + reportIssue.getNumber() + " - Add test failures:\n" + reportComment);
             }
         }
     }
 
-    private Optional<String> generateReportComment(GHWorkflowRun workflowRun,
+    private Optional<WorkflowReport> generateWorkflowReport(GHWorkflowRun workflowRun,
             BuildReporterConfig buildReporterConfig,
             WorkflowContext workflowContext,
             List<GHArtifact> artifacts,
@@ -228,27 +266,23 @@ public class BuildReporterEventHandler {
                 .sorted(buildReporterConfig.getJobNameComparator())
                 .collect(Collectors.toList());
 
-        Optional<WorkflowReport> workflowReportOptional = workflowRunAnalyzer.getReport(workflowRun, workflowContext, jobs,
+        return workflowRunAnalyzer.getReport(workflowRun, workflowContext, jobs,
                 surefireReportsArtifacts);
-        if (workflowReportOptional.isEmpty()) {
-            return Optional.empty();
-        }
+    }
 
-        WorkflowReport workflowReport = workflowReportOptional.get();
-
-        Optional<GHCheckRun> checkRunOptional = createCheckRun(workflowRun, buildReporterConfig, workflowContext,
-                artifactsAvailable, workflowReport);
-
+    private Optional<String> generateReportComment(WorkflowReport workflowReport,
+            GHCheckRun checkRun,
+            boolean artifactsAvailable) throws IOException {
         String reportComment = workflowReportFormatter.getReportComment(workflowReport,
                 artifactsAvailable,
-                checkRunOptional.orElse(null),
+                checkRun,
                 WorkflowConstants.MESSAGE_ID_ACTIVE,
                 true,
                 workflowReportJobIncludeStrategy);
         if (reportComment.length() > GITHUB_FIELD_LENGTH_HARD_LIMIT) {
             reportComment = workflowReportFormatter.getReportComment(workflowReport,
                     artifactsAvailable,
-                    checkRunOptional.orElse(null),
+                    checkRun,
                     WorkflowConstants.MESSAGE_ID_ACTIVE,
                     false,
                     workflowReportJobIncludeStrategy);
@@ -370,6 +404,9 @@ public class BuildReporterEventHandler {
     private void handleRequested(GHWorkflowRun workflowRun,
             BuildReporterConfig buildReporterConfig,
             GitHub gitHub, DynamicGraphQLClient gitHubGraphQLClient) throws IOException {
+        if (buildReporterConfig.isFork()) {
+            return;
+        }
 
         List<GHPullRequest> pullRequests = workflowRun.getRepository().queryPullRequests()
                 .state(GHIssueState.OPEN)
@@ -379,7 +416,8 @@ public class BuildReporterEventHandler {
             return;
         }
 
-        hideOutdatedWorkflowRunResults(buildReporterConfig, new WorkflowContext(pullRequests.get(0)), pullRequests.get(0),
+        hideOutdatedWorkflowRunResults(buildReporterConfig, WorkflowContext.pullRequest(pullRequests.get(0)),
+                pullRequests.get(0),
                 gitHubGraphQLClient);
     }
 

@@ -2,6 +2,7 @@ package io.quarkus.bot.buildreporter;
 
 import org.kohsuke.github.GHIssue;
 import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHRepository;
 
 public class WorkflowContext {
 
@@ -10,18 +11,32 @@ public class WorkflowContext {
     public final String logContext;
     public final String htmlUrl;
 
-    public WorkflowContext(GHIssue issue) {
-        this.repository = issue.getRepository().getFullName();
-        this.type = "Issue";
-        this.logContext = this.type + " #" + issue.getNumber();
-        this.htmlUrl = issue.getHtmlUrl().toString();
+    private WorkflowContext(String repository, String type, String logContext, String htmlUrl) {
+        this.repository = repository;
+        this.type = type;
+        this.logContext = this.type + " #" + logContext;
+        this.htmlUrl = htmlUrl;
     }
 
-    public WorkflowContext(GHPullRequest pullRequest) {
-        this.repository = pullRequest.getRepository().getFullName();
-        this.type = "Pull request";
-        this.logContext = this.type + " #" + pullRequest.getNumber();
-        this.htmlUrl = pullRequest.getHtmlUrl().toString();
+    public static WorkflowContext issue(GHIssue issue) {
+        return new WorkflowContext(issue.getRepository().getFullName(),
+                "Issue",
+                String.valueOf(issue.getNumber()),
+                issue.getHtmlUrl().toString());
+    }
+
+    public static WorkflowContext pullRequest(GHPullRequest pullRequest) {
+        return new WorkflowContext(pullRequest.getRepository().getFullName(),
+                "Pull request",
+                String.valueOf(pullRequest.getNumber()),
+                pullRequest.getHtmlUrl().toString());
+    }
+
+    public static WorkflowContext fork(GHRepository fork) {
+        return new WorkflowContext(fork.getFullName(),
+                "Fork",
+                fork.getFullName(),
+                fork.getHtmlUrl().toString());
     }
 
     public String getRepository() {

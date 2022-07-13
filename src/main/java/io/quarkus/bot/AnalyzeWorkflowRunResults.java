@@ -34,7 +34,11 @@ public class AnalyzeWorkflowRunResults {
     void analyzeWorkflowResults(@WorkflowRun.Completed @WorkflowRun.Requested GHEventPayload.WorkflowRun workflowRunPayload,
             @ConfigFile("quarkus-github-bot.yml") QuarkusGitHubBotConfigFile quarkusBotConfigFile,
             GitHub gitHub, DynamicGraphQLClient gitHubGraphQLClient) throws IOException {
-        if (!repositories.isMainRepository(workflowRunPayload.getRepository())) {
+        boolean isQuarkusRepository = repositories.isMainRepository(workflowRunPayload.getRepository());
+        boolean isForkOfQuarkusRepository = !isQuarkusRepository
+                && repositories.isForkOfMainRepository(workflowRunPayload.getRepository());
+
+        if (!isQuarkusRepository && !isForkOfQuarkusRepository) {
             return;
         }
         if (!Feature.ANALYZE_WORKFLOW_RUN_RESULTS.isEnabled(quarkusBotConfigFile)) {
@@ -45,6 +49,7 @@ public class AnalyzeWorkflowRunResults {
                 .dryRun(quarkusBotConfig.isDryRun())
                 .monitoredWorkflows(quarkusBotConfigFile.workflowRunAnalysis.workflows)
                 .workflowJobComparator(QuarkusWorkflowJobComparator.INSTANCE)
+                .fork(isForkOfQuarkusRepository)
                 .build();
 
         buildReporterEventHandler.handle(workflowRunPayload, buildReporterConfig, gitHub, gitHubGraphQLClient);

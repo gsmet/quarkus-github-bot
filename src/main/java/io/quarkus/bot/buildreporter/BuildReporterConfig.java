@@ -11,12 +11,14 @@ public class BuildReporterConfig {
     private final boolean dryRun;
     private final Comparator<GHWorkflowJob> workflowJobComparator;
     private final Set<String> monitoredWorkflows;
+    private final boolean fork;
 
     private BuildReporterConfig(boolean dryRun, Comparator<GHWorkflowJob> workflowJobComparator,
-            Set<String> monitoredWorkflows) {
+            Set<String> monitoredWorkflows, boolean fork) {
         this.dryRun = dryRun;
         this.workflowJobComparator = workflowJobComparator;
         this.monitoredWorkflows = monitoredWorkflows;
+        this.fork = fork;
     }
 
     public boolean isDryRun() {
@@ -31,6 +33,10 @@ public class BuildReporterConfig {
         return monitoredWorkflows;
     }
 
+    public boolean isFork() {
+        return fork;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -40,6 +46,7 @@ public class BuildReporterConfig {
         private boolean dryRun = false;
         private Comparator<GHWorkflowJob> workflowJobComparator = DefaultJobNameComparator.INSTANCE;
         private Set<String> monitoredWorkflows = Collections.emptySet();
+        private boolean fork = false;
 
         public Builder dryRun(boolean dryRun) {
             this.dryRun = dryRun;
@@ -56,8 +63,13 @@ public class BuildReporterConfig {
             return this;
         }
 
+        public Builder fork(boolean fork) {
+            this.fork = fork;
+            return this;
+        }
+
         public BuildReporterConfig build() {
-            return new BuildReporterConfig(dryRun, workflowJobComparator, monitoredWorkflows);
+            return new BuildReporterConfig(dryRun, workflowJobComparator, monitoredWorkflows, fork);
         }
     }
 
