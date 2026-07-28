@@ -22,15 +22,19 @@ class TitleViolationDetector implements ViolationDetector {
     @Override
     public List<EditorialViolation> detectViolations(GHPullRequest pullRequest) {
         String baseBranch = "";
+        String defaultBranch = "";
         if (pullRequest.getBase() != null) {
             baseBranch = pullRequest.getBase().getRef();
+            if (pullRequest.getBase().getRepository() != null) {
+                defaultBranch = pullRequest.getBase().getRepository().getDefaultBranch();
+            }
         }
 
         String originalTitle = pullRequest.getTitle();
-        String normalizedTitle = GHPullRequests.normalizeTitle(originalTitle, baseBranch);
+        String normalizedTitle = GHPullRequests.normalizeTitle(originalTitle, baseBranch, defaultBranch);
 
-        // we remove the potential version prefix before checking the editorial rules
-        String title = GHPullRequests.dropVersionSuffix(normalizedTitle, baseBranch);
+        // we remove the potential branch prefix before checking the editorial rules
+        String title = GHPullRequests.dropBranchPrefix(normalizedTitle, baseBranch, defaultBranch);
 
         return getTitleViolations(title);
     }
