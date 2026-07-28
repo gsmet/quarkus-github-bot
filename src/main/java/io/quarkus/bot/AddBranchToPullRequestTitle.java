@@ -27,9 +27,10 @@ class AddBranchToPullRequestTitle {
 
         GHPullRequest pullRequest = pullRequestPayload.getPullRequest();
         String baseBranch = pullRequest.getBase().getRef();
+        String defaultBranch = pullRequestPayload.getRepository().getDefaultBranch();
 
         String originalTitle = pullRequest.getTitle();
-        String normalizedTitle = GHPullRequests.normalizeTitle(originalTitle, baseBranch);
+        String normalizedTitle = GHPullRequests.normalizeTitle(originalTitle, baseBranch, defaultBranch);
 
         if (!originalTitle.equals(normalizedTitle)) {
             gitHubBotActions.setPullRequestTitle(pullRequest, normalizedTitle);

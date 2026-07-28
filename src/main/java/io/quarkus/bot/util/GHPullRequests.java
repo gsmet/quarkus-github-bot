@@ -18,25 +18,41 @@ public final class GHPullRequests {
         return false;
     }
 
-    public static String dropVersionSuffix(String title, String branch) {
+    public static String dropBranchPrefix(String title, String branch, String defaultBranch) {
         if (title == null || title.isBlank()) {
             return title;
         }
-        if (!Branches.isVersionBranch(branch)) {
+        if (isDefaultBranch(branch, defaultBranch)) {
             return title;
         }
 
-        return CLEAN_VERSION_PATTERN.matcher(title).replaceFirst("");
+        if (Branches.isVersionBranch(branch)) {
+            return CLEAN_VERSION_PATTERN.matcher(title).replaceFirst("");
+        }
+
+        String exactPrefix = "[" + branch + "]";
+        String stripped = title.stripLeading();
+        if (stripped.startsWith(exactPrefix)) {
+            return stripped.substring(exactPrefix.length()).stripLeading();
+        }
+        return title;
     }
 
-    public static String normalizeTitle(String title, String branch) {
+    public static String normalizeTitle(String title, String branch, String defaultBranch) {
         if (title == null || title.isBlank()) {
             return title;
         }
-        if (!Branches.isVersionBranch(branch)) {
+        if (isDefaultBranch(branch, defaultBranch)) {
             return title;
         }
 
-        return "[" + branch + "] " + dropVersionSuffix(title, branch);
+        return "[" + branch + "] " + dropBranchPrefix(title, branch, defaultBranch);
+    }
+
+    private static boolean isDefaultBranch(String branch, String defaultBranch) {
+        if (branch == null || branch.isBlank()) {
+            return true;
+        }
+        return branch.equals(defaultBranch);
     }
 }
